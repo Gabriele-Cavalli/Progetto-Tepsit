@@ -3,8 +3,19 @@ var ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 var keys = {};
+var gameRunning = false;
+var score = 0;
+var playerLives = 3;
+var gameStarted = false;
 window.addEventListener('keydown', function (e) {
     keys[e.code] = true;
+    if (!gameStarted && e.code === 'Enter') {
+        gameStarted = true;
+        startGame();
+    }
+    else if (!gameRunning && e.code === 'Enter') {
+        startGame();
+    }
     e.preventDefault();
 });
 window.addEventListener('keyup', function (e) {
@@ -19,7 +30,7 @@ var Tank = /** @class */ (function () {
         this.x = x;
         this.y = y;
         this.angle = 0;
-        this.speed = 200; // pixels per second
+        this.speed = 200;
     }
     Tank.prototype.draw = function () {
         ctx.save();
@@ -37,12 +48,10 @@ var Tank = /** @class */ (function () {
             this.x += distance * Math.cos(this.angle);
             this.y += distance * Math.sin(this.angle);
         }
-        if (keys['ArrowLeft']) {
-            this.angle -= 2 * delta; // radians per second
-        }
-        if (keys['ArrowRight']) {
+        if (keys['ArrowLeft'])
+            this.angle -= 2 * delta;
+        if (keys['ArrowRight'])
             this.angle += 2 * delta;
-        }
         if (keys['Space'] && performance.now() - this.lastShotTime > this.shotCooldown) {
             this.shoot();
             this.lastShotTime = performance.now();
@@ -57,7 +66,7 @@ var Tank = /** @class */ (function () {
 }());
 var Bullet = /** @class */ (function () {
     function Bullet(x, y, angle) {
-        this.speed = 400; // pixels per second
+        this.speed = 400;
         this.active = true;
         this.x = x;
         this.y = y;
@@ -80,7 +89,7 @@ var Bullet = /** @class */ (function () {
 }());
 var Enemy = /** @class */ (function () {
     function Enemy() {
-        this.speed = 80; // pixels per second
+        this.speed = 80;
         this.alive = true;
         this.x = Math.random() * canvas.width;
         this.y = Math.random() * canvas.height;
@@ -89,8 +98,10 @@ var Enemy = /** @class */ (function () {
         var dx = targetX - this.x;
         var dy = targetY - this.y;
         var length = Math.sqrt(dx * dx + dy * dy);
-        this.x += (dx / length) * this.speed * delta;
-        this.y += (dy / length) * this.speed * delta;
+        if (length !== 0) {
+            this.x += (dx / length) * this.speed * delta;
+            this.y += (dy / length) * this.speed * delta;
+        }
     };
     Enemy.prototype.draw = function () {
         ctx.fillStyle = 'green';
@@ -100,33 +111,102 @@ var Enemy = /** @class */ (function () {
 }());
 var tank = new Tank(canvas.width / 2, canvas.height / 2);
 var enemies = [];
+var lastTime = performance.now();
+function startGame() {
+    tank = new Tank(canvas.width / 2, canvas.height / 2);
+    enemies = [];
+    score = 0;
+    playerLives = 3;
+    gameRunning = true;
+    spawnEnemy();
+    requestAnimationFrame(gameLoop);
+}
 function spawnEnemy() {
-    if (enemies.length < 5) {
+    if (gameRunning && enemies.length < 5) {
         enemies.push(new Enemy());
     }
-    setTimeout(spawnEnemy, 2000);
+    if (gameRunning) {
+        setTimeout(spawnEnemy, 2000);
+    }
 }
-spawnEnemy();
-var lastTime = performance.now();
+function drawHUD() {
+    ctx.fillStyle = 'black';
+    ctx.font = '20px Arial';
+    ctx.textAlign = 'left'; // FIX
+    ctx.fillText("Punti: ".concat(score), 20, 30);
+    ctx.fillText("Vita: ".concat(playerLives), 20, 60);
+}
+function checkCollisions() {
+    tank.bullets.forEach(function (bullet) {
+        enemies.forEach(function (enemy) {
+            var dx = bullet.x - enemy.x;
+            var dy = bullet.y - enemy.y;
+            var distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < 15 && enemy.alive && bullet.active) {
+                bullet.active = false;
+                enemy.alive = false;
+                score += 10;
+            }
+        });
+    });
+    enemies.forEach(function (enemy) {
+        var dx = tank.x - enemy.x;
+        var dy = tank.y - enemy.y;
+        var distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < 25 && enemy.alive) {
+            playerLives -= 1;
+            enemy.alive = false;
+            if (playerLives <= 0) {
+                gameRunning = false;
+            }
+        }
+    });
+}
 function gameLoop(currentTime) {
     var delta = (currentTime - lastTime) / 1000;
     lastTime = currentTime;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!gameStarted) {
+        drawStartScreen();
+        return;
+    }
+    if (!gameRunning) {
+        drawGameOver();
+        return;
+    }
     tank.update(delta);
     tank.draw();
-    tank.bullets.forEach(function (bullet, index) {
+    tank.bullets = tank.bullets.filter(function (b) { return b.active; });
+    tank.bullets.forEach(function (bullet) {
         bullet.update(delta);
-        if (!bullet.active) {
-            tank.bullets.splice(index, 1);
-        }
-        else {
-            bullet.draw();
-        }
+        bullet.draw();
     });
+    enemies = enemies.filter(function (e) { return e.alive; });
     enemies.forEach(function (enemy) {
         enemy.update(delta, tank.x, tank.y);
         enemy.draw();
     });
+    checkCollisions();
+    drawHUD();
     requestAnimationFrame(gameLoop);
 }
-gameLoop(performance.now());
+function drawStartScreen() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'black';
+    ctx.font = '36px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Tank Mini-Game', canvas.width / 2, canvas.height / 2 - 40);
+    ctx.font = '24px Arial';
+    ctx.fillText('Premi ENTER per iniziare', canvas.width / 2, canvas.height / 2);
+}
+function drawGameOver() {
+    ctx.fillStyle = 'black';
+    ctx.font = '48px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 20);
+    ctx.font = '24px Arial';
+    ctx.fillText("Punteggio: ".concat(score), canvas.width / 2, canvas.height / 2 + 20);
+    ctx.fillText('Premi ENTER per ricominciare', canvas.width / 2, canvas.height / 2 + 60);
+}
+// Avvio con schermata iniziale
+drawStartScreen();
