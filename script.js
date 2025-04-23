@@ -1,3 +1,4 @@
+// script.ts
 var canvas = document.getElementById('gameCanvas');
 var ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
@@ -7,9 +8,24 @@ var gameRunning = false;
 var score = 0;
 var playerLives = 3;
 var gameStarted = false;
+var playerName = "";
+var leaderboard = JSON.parse(localStorage.getItem("leaderboard") || "[]");
+document.getElementById('playerNameInput').addEventListener('input', function (e) {
+    var input = e.target;
+    playerName = input.value.trim();
+});
 window.addEventListener('keydown', function (e) {
+    // Non interferire con l’input se stai scrivendo nel campo del nome
+    var active = document.activeElement;
+    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+        return;
+    }
     keys[e.code] = true;
     if (!gameStarted && e.code === 'Enter') {
+        if (!playerName) {
+            alert("Inserisci il tuo nome prima di iniziare!");
+            return;
+        }
         gameStarted = true;
         startGame();
     }
@@ -24,13 +40,13 @@ window.addEventListener('keyup', function (e) {
 });
 var Tank = /** @class */ (function () {
     function Tank(x, y) {
+        this.speed = 200;
         this.bullets = [];
         this.lastShotTime = 0;
         this.shotCooldown = 300;
         this.x = x;
         this.y = y;
         this.angle = 0;
-        this.speed = 200;
     }
     Tank.prototype.draw = function () {
         ctx.save();
@@ -132,7 +148,7 @@ function spawnEnemy() {
 function drawHUD() {
     ctx.fillStyle = 'black';
     ctx.font = '20px Arial';
-    ctx.textAlign = 'left'; // FIX
+    ctx.textAlign = 'left';
     ctx.fillText("Punti: ".concat(score), 20, 30);
     ctx.fillText("Vita: ".concat(playerLives), 20, 60);
 }
@@ -162,6 +178,37 @@ function checkCollisions() {
         }
     });
 }
+function drawStartScreen() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'black';
+    ctx.font = '36px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Tank Mini-Game', canvas.width / 2, canvas.height / 2 - 40);
+    ctx.font = '24px Arial';
+    ctx.fillText('Inserisci il tuo nome e premi ENTER per iniziare', canvas.width / 2, canvas.height / 2);
+}
+function drawGameOver() {
+    ctx.fillStyle = 'black';
+    ctx.font = '48px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 20);
+    ctx.font = '24px Arial';
+    ctx.fillText("Punteggio: ".concat(score), canvas.width / 2, canvas.height / 2 + 20);
+    ctx.fillText('Premi ENTER per ricominciare', canvas.width / 2, canvas.height / 2 + 60);
+    leaderboard.push({ name: playerName, score: score });
+    leaderboard.sort(function (a, b) { return b.score - a.score; });
+    leaderboard = leaderboard.slice(0, 5);
+    localStorage.setItem("leaderboard", JSON.stringify(leaderboard));
+    renderLeaderboard();
+}
+function renderLeaderboard() {
+    var board = document.getElementById('leaderboard');
+    var html = "<strong>Classifica</strong><br>";
+    leaderboard.forEach(function (entry) {
+        html += "".concat(entry.name, ": ").concat(entry.score, "<br>");
+    });
+    board.innerHTML = html;
+}
 function gameLoop(currentTime) {
     var delta = (currentTime - lastTime) / 1000;
     lastTime = currentTime;
@@ -190,23 +237,5 @@ function gameLoop(currentTime) {
     drawHUD();
     requestAnimationFrame(gameLoop);
 }
-function drawStartScreen() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = 'black';
-    ctx.font = '36px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('Tank Mini-Game', canvas.width / 2, canvas.height / 2 - 40);
-    ctx.font = '24px Arial';
-    ctx.fillText('Premi ENTER per iniziare', canvas.width / 2, canvas.height / 2);
-}
-function drawGameOver() {
-    ctx.fillStyle = 'black';
-    ctx.font = '48px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 20);
-    ctx.font = '24px Arial';
-    ctx.fillText("Punteggio: ".concat(score), canvas.width / 2, canvas.height / 2 + 20);
-    ctx.fillText('Premi ENTER per ricominciare', canvas.width / 2, canvas.height / 2 + 60);
-}
-// Avvio con schermata iniziale
 drawStartScreen();
+renderLeaderboard();

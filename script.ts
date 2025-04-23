@@ -3,22 +3,45 @@ const ctx = canvas.getContext('2d')!;
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-type Keys = { [key: string]: boolean };
-const keys: Keys = {};
-
+let keys: { [key: string]: boolean } = {};
 let gameRunning = false;
 let score = 0;
 let playerLives = 3;
 let gameStarted = false;
+let playerName = "";
+
+interface ScoreEntry {
+  name: string;
+  score: number;
+}
+
+let leaderboard: ScoreEntry[] = JSON.parse(localStorage.getItem("leaderboard") || "[]");
+
+(document.getElementById('playerNameInput') as HTMLInputElement).addEventListener('input', (e) => {
+  const input = e.target as HTMLInputElement;
+  playerName = input.value.trim();
+});
 
 window.addEventListener('keydown', (e) => {
+  // Non interferire con l’input se stai scrivendo nel campo del nome
+  const active = document.activeElement;
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+    return;
+  }
+
   keys[e.code] = true;
+
   if (!gameStarted && e.code === 'Enter') {
+    if (!playerName) {
+      alert("Inserisci il tuo nome prima di iniziare!");
+      return;
+    }
     gameStarted = true;
     startGame();
   } else if (!gameRunning && e.code === 'Enter') {
     startGame();
   }
+
   e.preventDefault();
 });
 
@@ -31,7 +54,7 @@ class Tank {
   x: number;
   y: number;
   angle: number;
-  speed: number;
+  speed: number = 200;
   bullets: Bullet[] = [];
   lastShotTime: number = 0;
   shotCooldown: number = 300;
@@ -40,7 +63,6 @@ class Tank {
     this.x = x;
     this.y = y;
     this.angle = 0;
-    this.speed = 200;
   }
 
   draw() {
@@ -62,7 +84,6 @@ class Tank {
     }
     if (keys['ArrowLeft']) this.angle -= 2 * delta;
     if (keys['ArrowRight']) this.angle += 2 * delta;
-
     if (keys['Space'] && performance.now() - this.lastShotTime > this.shotCooldown) {
       this.shoot();
       this.lastShotTime = performance.now();
@@ -158,7 +179,7 @@ function spawnEnemy() {
 function drawHUD() {
   ctx.fillStyle = 'black';
   ctx.font = '20px Arial';
-  ctx.textAlign = 'left'; // FIX
+  ctx.textAlign = 'left';
   ctx.fillText(`Punti: ${score}`, 20, 30);
   ctx.fillText(`Vita: ${playerLives}`, 20, 60);
 }
@@ -191,10 +212,44 @@ function checkCollisions() {
   });
 }
 
+function drawStartScreen() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = 'black';
+  ctx.font = '36px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Tank Mini-Game', canvas.width / 2, canvas.height / 2 - 40);
+  ctx.font = '24px Arial';
+  ctx.fillText('Inserisci il tuo nome e premi ENTER per iniziare', canvas.width / 2, canvas.height / 2);
+}
+
+function drawGameOver() {
+  ctx.fillStyle = 'black';
+  ctx.font = '48px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 20);
+  ctx.font = '24px Arial';
+  ctx.fillText(`Punteggio: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
+  ctx.fillText('Premi ENTER per ricominciare', canvas.width / 2, canvas.height / 2 + 60);
+
+  leaderboard.push({ name: playerName, score });
+  leaderboard.sort((a, b) => b.score - a.score);
+  leaderboard = leaderboard.slice(0, 5);
+  localStorage.setItem("leaderboard", JSON.stringify(leaderboard));
+  renderLeaderboard();
+}
+
+function renderLeaderboard() {
+  const board = document.getElementById('leaderboard')!;
+  let html = "<strong>Classifica</strong><br>";
+  leaderboard.forEach(entry => {
+    html += `${entry.name}: ${entry.score}<br>`;
+  });
+  board.innerHTML = html;
+}
+
 function gameLoop(currentTime: number) {
   const delta = (currentTime - lastTime) / 1000;
   lastTime = currentTime;
-
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   if (!gameStarted) {
@@ -210,13 +265,13 @@ function gameLoop(currentTime: number) {
   tank.update(delta);
   tank.draw();
 
-  tank.bullets = tank.bullets.filter((b) => b.active);
+  tank.bullets = tank.bullets.filter(b => b.active);
   tank.bullets.forEach((bullet) => {
     bullet.update(delta);
     bullet.draw();
   });
 
-  enemies = enemies.filter((e) => e.alive);
+  enemies = enemies.filter(e => e.alive);
   enemies.forEach((enemy) => {
     enemy.update(delta, tank.x, tank.y);
     enemy.draw();
@@ -224,29 +279,8 @@ function gameLoop(currentTime: number) {
 
   checkCollisions();
   drawHUD();
-
   requestAnimationFrame(gameLoop);
 }
 
-function drawStartScreen() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = 'black';
-  ctx.font = '36px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText('Tank Mini-Game', canvas.width / 2, canvas.height / 2 - 40);
-  ctx.font = '24px Arial';
-  ctx.fillText('Premi ENTER per iniziare', canvas.width / 2, canvas.height / 2);
-}
-
-function drawGameOver() {
-  ctx.fillStyle = 'black';
-  ctx.font = '48px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 20);
-  ctx.font = '24px Arial';
-  ctx.fillText(`Punteggio: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
-  ctx.fillText('Premi ENTER per ricominciare', canvas.width / 2, canvas.height / 2 + 60);
-}
-
-// Avvio con schermata iniziale
 drawStartScreen();
+renderLeaderboard();
