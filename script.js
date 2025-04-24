@@ -1,4 +1,3 @@
-// script.ts
 var canvas = document.getElementById('gameCanvas');
 var ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
@@ -150,7 +149,25 @@ function drawHUD() {
     ctx.font = '20px Arial';
     ctx.textAlign = 'left';
     ctx.fillText("Punti: ".concat(score), 20, 30);
-    ctx.fillText("Vita: ".concat(playerLives), 20, 60);
+    for (var i = 0; i < playerLives; i++) {
+        drawHeart(ctx, 20 + (i * 30), 60, 2.5);
+    }
+    //ctx.fillText(`Vita: ${playerLives}`, 20, 60);
+}
+function drawHeart(ctx, x, y, size) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.translate(x, y);
+    ctx.scale(size, size);
+    ctx.moveTo(0, 0);
+    ctx.bezierCurveTo(0, -3, -5, -3, -5, 0);
+    ctx.bezierCurveTo(-5, 3, 0, 5, 0, 7);
+    ctx.bezierCurveTo(0, 5, 5, 3, 5, 0);
+    ctx.bezierCurveTo(5, -3, 0, -3, 0, 0);
+    ctx.closePath();
+    ctx.fillStyle = "red";
+    ctx.fill();
+    ctx.restore();
 }
 function checkCollisions() {
     tank.bullets.forEach(function (bullet) {
@@ -195,11 +212,13 @@ function drawGameOver() {
     ctx.font = '24px Arial';
     ctx.fillText("Punteggio: ".concat(score), canvas.width / 2, canvas.height / 2 + 20);
     ctx.fillText('Premi ENTER per ricominciare', canvas.width / 2, canvas.height / 2 + 60);
-    leaderboard.push({ name: playerName, score: score });
-    leaderboard.sort(function (a, b) { return b.score - a.score; });
-    leaderboard = leaderboard.slice(0, 5);
-    localStorage.setItem("leaderboard", JSON.stringify(leaderboard));
-    renderLeaderboard();
+    if (score > 0) {
+        leaderboard.push({ name: playerName, score: score });
+        leaderboard.sort(function (a, b) { return b.score - a.score; });
+        leaderboard = leaderboard.slice(0, 5);
+        localStorage.setItem("leaderboard", JSON.stringify(leaderboard));
+        renderLeaderboard();
+    }
 }
 function renderLeaderboard() {
     var board = document.getElementById('leaderboard');
