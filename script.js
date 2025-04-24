@@ -9,12 +9,15 @@ var playerLives = 3;
 var gameStarted = false;
 var playerName = "";
 var leaderboard = JSON.parse(localStorage.getItem("leaderboard") || "[]");
+// Aggiunte per la selezione del colore
+var colors = ['blue', 'red', 'yellow'];
+var selectedColorIndex = 0;
+var tankColor = colors[selectedColorIndex];
 document.getElementById('playerNameInput').addEventListener('input', function (e) {
     var input = e.target;
     playerName = input.value.trim();
 });
 window.addEventListener('keydown', function (e) {
-    // Non interferire con l’input se stai scrivendo nel campo del nome
     var active = document.activeElement;
     if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
         return;
@@ -37,6 +40,28 @@ window.addEventListener('keyup', function (e) {
     keys[e.code] = false;
     e.preventDefault();
 });
+// Gestione del click per selezione colore
+canvas.addEventListener('click', function (e) {
+    if (!gameStarted || !gameRunning) {
+        var rect = canvas.getBoundingClientRect();
+        var mouseX_1 = e.clientX - rect.left;
+        var mouseY_1 = e.clientY - rect.top;
+        var squareSize_1 = 40;
+        var totalWidth = colors.length * squareSize_1 + (colors.length - 1) * 20;
+        var startX_1 = canvas.width / 2 - totalWidth / 2;
+        var startY_1 = canvas.height / 2 + 20;
+        colors.forEach(function (_, index) {
+            var x = startX_1 + index * (squareSize_1 + 20);
+            var y = startY_1;
+            if (mouseX_1 >= x && mouseX_1 <= x + squareSize_1 &&
+                mouseY_1 >= y && mouseY_1 <= y + squareSize_1) {
+                selectedColorIndex = index;
+                tankColor = colors[selectedColorIndex];
+                drawStartScreen();
+            }
+        });
+    }
+});
 var Tank = /** @class */ (function () {
     function Tank(x, y) {
         this.speed = 200;
@@ -51,7 +76,7 @@ var Tank = /** @class */ (function () {
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
-        ctx.fillStyle = 'blue';
+        ctx.fillStyle = tankColor;
         ctx.fillRect(-15, -10, 30, 20);
         ctx.fillStyle = 'black';
         ctx.fillRect(10, -3, 15, 6);
@@ -152,7 +177,6 @@ function drawHUD() {
     for (var i = 0; i < playerLives; i++) {
         drawHeart(ctx, 20 + (i * 30), 60, 2.5);
     }
-    //ctx.fillText(`Vita: ${playerLives}`, 20, 60);
 }
 function drawHeart(ctx, x, y, size) {
     ctx.save();
@@ -200,9 +224,26 @@ function drawStartScreen() {
     ctx.fillStyle = 'black';
     ctx.font = '36px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('Tank Mini-Game', canvas.width / 2, canvas.height / 2 - 40);
+    ctx.fillText('Tank Mini-Game', canvas.width / 2, canvas.height / 2 - 80);
     ctx.font = '24px Arial';
-    ctx.fillText('Inserisci il tuo nome e premi ENTER per iniziare', canvas.width / 2, canvas.height / 2);
+    ctx.fillText('Inserisci il tuo nome e premi ENTER per iniziare', canvas.width / 2, canvas.height / 2 - 40);
+    // Disegna i quadrati colorati
+    var squareSize = 40;
+    var totalWidth = colors.length * squareSize + (colors.length - 1) * 20;
+    var startX = canvas.width / 2 - totalWidth / 2;
+    colors.forEach(function (color, index) {
+        var x = startX + index * (squareSize + 20);
+        var y = canvas.height / 2 + 20;
+        // Disegna il bordo se selezionato
+        if (index === selectedColorIndex) {
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(x - 5, y - 5, squareSize + 10, squareSize + 10);
+        }
+        // Disegna il quadrato colorato
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, squareSize, squareSize);
+    });
 }
 function drawGameOver() {
     ctx.fillStyle = 'black';
@@ -219,6 +260,7 @@ function drawGameOver() {
         localStorage.setItem("leaderboard", JSON.stringify(leaderboard));
         renderLeaderboard();
     }
+    drawStartScreen();
 }
 function renderLeaderboard() {
     var board = document.getElementById('leaderboard');

@@ -17,13 +17,17 @@ interface ScoreEntry {
 
 let leaderboard: ScoreEntry[] = JSON.parse(localStorage.getItem("leaderboard") || "[]");
 
+// Aggiunte per la selezione del colore
+const colors = ['blue', 'red', 'yellow'];
+let selectedColorIndex = 0;
+let tankColor = colors[selectedColorIndex];
+
 (document.getElementById('playerNameInput') as HTMLInputElement).addEventListener('input', (e) => {
   const input = e.target as HTMLInputElement;
   playerName = input.value.trim();
 });
 
 window.addEventListener('keydown', (e) => {
-  // Non interferire con l’input se stai scrivendo nel campo del nome
   const active = document.activeElement;
   if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
     return;
@@ -50,6 +54,32 @@ window.addEventListener('keyup', (e) => {
   e.preventDefault();
 });
 
+// Gestione del click per selezione colore
+canvas.addEventListener('click', (e) => {
+  if (!gameStarted || !gameRunning) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    const squareSize = 40;
+    const totalWidth = colors.length * squareSize + (colors.length - 1) * 20;
+    const startX = canvas.width / 2 - totalWidth / 2;
+    const startY = canvas.height / 2 + 20;
+    
+    colors.forEach((_, index) => {
+      const x = startX + index * (squareSize + 20);
+      const y = startY;
+      
+      if (mouseX >= x && mouseX <= x + squareSize && 
+          mouseY >= y && mouseY <= y + squareSize) {
+        selectedColorIndex = index;
+        tankColor = colors[selectedColorIndex];
+        drawStartScreen();
+      }
+    });
+  }
+});
+
 class Tank {
   x: number;
   y: number;
@@ -69,7 +99,7 @@ class Tank {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
-    ctx.fillStyle = 'blue';
+    ctx.fillStyle = tankColor;
     ctx.fillRect(-15, -10, 30, 20);
     ctx.fillStyle = 'black';
     ctx.fillRect(10, -3, 15, 6);
@@ -184,7 +214,6 @@ function drawHUD() {
   for(let i = 0; i < playerLives; i++){
     drawHeart(ctx,20+(i*30),60,2.5);
   }
-  //ctx.fillText(`Vita: ${playerLives}`, 20, 60);
 }
 
 function drawHeart(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
@@ -236,9 +265,30 @@ function drawStartScreen() {
   ctx.fillStyle = 'black';
   ctx.font = '36px Arial';
   ctx.textAlign = 'center';
-  ctx.fillText('Tank Mini-Game', canvas.width / 2, canvas.height / 2 - 40);
+  ctx.fillText('Tank Mini-Game', canvas.width / 2, canvas.height / 2 - 80);
   ctx.font = '24px Arial';
-  ctx.fillText('Inserisci il tuo nome e premi ENTER per iniziare', canvas.width / 2, canvas.height / 2);
+  ctx.fillText('Inserisci il tuo nome e premi ENTER per iniziare', canvas.width / 2, canvas.height / 2 - 40);
+  
+  // Disegna i quadrati colorati
+  const squareSize = 40;
+  const totalWidth = colors.length * squareSize + (colors.length - 1) * 20;
+  const startX = canvas.width / 2 - totalWidth / 2;
+  
+  colors.forEach((color, index) => {
+    const x = startX + index * (squareSize + 20);
+    const y = canvas.height / 2 + 20;
+    
+    // Disegna il bordo se selezionato
+    if (index === selectedColorIndex) {
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x - 5, y - 5, squareSize + 10, squareSize + 10);
+    }
+    
+    // Disegna il quadrato colorato
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, squareSize, squareSize);
+  });
 }
 
 function drawGameOver() {
@@ -249,14 +299,16 @@ function drawGameOver() {
   ctx.font = '24px Arial';
   ctx.fillText(`Punteggio: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
   ctx.fillText('Premi ENTER per ricominciare', canvas.width / 2, canvas.height / 2 + 60);
-  if(score > 0){
+  
+  if (score > 0) {
     leaderboard.push({ name: playerName, score });
-  leaderboard.sort((a, b) => b.score - a.score);
-  leaderboard = leaderboard.slice(0, 5);
-  localStorage.setItem("leaderboard", JSON.stringify(leaderboard));
-  renderLeaderboard();
+    leaderboard.sort((a, b) => b.score - a.score);
+    leaderboard = leaderboard.slice(0, 5);
+    localStorage.setItem("leaderboard", JSON.stringify(leaderboard));
+    renderLeaderboard();
   }
   
+  drawStartScreen();
 }
 
 function renderLeaderboard() {
