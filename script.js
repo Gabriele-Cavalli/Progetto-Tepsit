@@ -62,12 +62,79 @@ canvas.addEventListener('click', function (e) {
         });
     }
 });
+var PowerUp = /** @class */ (function () {
+    function PowerUp(type) {
+        this.active = true;
+        this.duration = 10000; // 10 secondi
+        this.size = 20;
+        this.x = Math.random() * (canvas.width - 40) + 20;
+        this.y = Math.random() * (canvas.height - 40) + 20;
+        this.type = type;
+        this.spawnTime = performance.now();
+    }
+    PowerUp.prototype.draw = function () {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        if (this.type === 'speed') {
+            // Disegna stella arancione
+            ctx.fillStyle = 'orange';
+            drawStar(ctx, 0, 0, 5, this.size, this.size / 2);
+        }
+        else {
+            // Disegna scudo azzurro
+            ctx.fillStyle = 'cyan';
+            drawShield(ctx, 0, 0, this.size);
+        }
+        ctx.restore();
+    };
+    PowerUp.prototype.update = function () {
+        // Il power-up scompare dopo un certo tempo
+        if (performance.now() - this.spawnTime > this.duration) {
+            this.active = false;
+        }
+    };
+    return PowerUp;
+}());
+// Funzione per disegnare una stella
+function drawStar(ctx, cx, cy, spikes, outerRadius, innerRadius) {
+    var rot = Math.PI / 2 * 3;
+    var x = cx;
+    var y = cy;
+    var step = Math.PI / spikes;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - outerRadius);
+    for (var i = 0; i < spikes; i++) {
+        x = cx + Math.cos(rot) * outerRadius;
+        y = cy + Math.sin(rot) * outerRadius;
+        ctx.lineTo(x, y);
+        rot += step;
+        x = cx + Math.cos(rot) * innerRadius;
+        y = cy + Math.sin(rot) * innerRadius;
+        ctx.lineTo(x, y);
+        rot += step;
+    }
+    ctx.lineTo(cx, cy - outerRadius);
+    ctx.closePath();
+    ctx.fill();
+}
+// Funzione per disegnare uno scudo
+function drawShield(ctx, cx, cy, size) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - size / 2);
+    ctx.quadraticCurveTo(cx + size / 2, cy, cx, cy + size / 2);
+    ctx.quadraticCurveTo(cx - size / 2, cy, cx, cy - size / 2);
+    ctx.closePath();
+    ctx.fill();
+}
 var Tank = /** @class */ (function () {
     function Tank(x, y) {
+        this.baseSpeed = 200;
         this.speed = 200;
         this.bullets = [];
         this.lastShotTime = 0;
         this.shotCooldown = 300;
+        this.hasShield = false;
+        this.powerUpEndTime = 0;
         this.x = x;
         this.y = y;
         this.angle = 0;
@@ -76,6 +143,13 @@ var Tank = /** @class */ (function () {
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
+        // Disegna scudo se attivo
+        if (this.hasShield) {
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.3)';
+            ctx.beginPath();
+            ctx.arc(0, 0, 30, 0, Math.PI * 2);
+            ctx.fill();
+        }
         ctx.fillStyle = tankColor;
         ctx.fillRect(-15, -10, 30, 20);
         ctx.fillStyle = 'black';
@@ -83,6 +157,12 @@ var Tank = /** @class */ (function () {
         ctx.restore();
     };
     Tank.prototype.update = function (delta) {
+        // Controlla se i power-up sono scaduti
+        if (this.powerUpEndTime > 0 && performance.now() > this.powerUpEndTime) {
+            this.speed = this.baseSpeed;
+            this.hasShield = false;
+            this.powerUpEndTime = 0;
+        }
         var distance = this.speed * delta;
         if (keys['ArrowUp']) {
             this.x += distance * Math.cos(this.angle);
@@ -100,6 +180,16 @@ var Tank = /** @class */ (function () {
     Tank.prototype.shoot = function () {
         if (this.bullets.length < 5) {
             this.bullets.push(new Bullet(this.x, this.y, this.angle));
+        }
+    };
+    Tank.prototype.applyPowerUp = function (type) {
+        if (type === 'speed') {
+            this.speed = this.baseSpeed * 1.5; // Aumenta la velocità del 50%
+            this.powerUpEndTime = performance.now() + 10000; // 10 secondi
+        }
+        else if (type === 'shield') {
+            this.hasShield = true;
+            this.powerUpEndTime = performance.now() + 10000; // 10 secondi
         }
     };
     return Tank;
@@ -151,14 +241,19 @@ var Enemy = /** @class */ (function () {
 }());
 var tank = new Tank(canvas.width / 2, canvas.height / 2);
 var enemies = [];
+var powerUps = [];
 var lastTime = performance.now();
+var lastPowerUpSpawnTime = 0;
+var powerUpSpawnInterval = 15000; // 15 secondi
 function startGame() {
     tank = new Tank(canvas.width / 2, canvas.height / 2);
     enemies = [];
+    powerUps = [];
     score = 0;
     playerLives = 3;
     gameRunning = true;
     spawnEnemy();
+    lastPowerUpSpawnTime = performance.now();
     requestAnimationFrame(gameLoop);
 }
 function spawnEnemy() {
@@ -169,13 +264,31 @@ function spawnEnemy() {
         setTimeout(spawnEnemy, 2000);
     }
 }
+function spawnPowerUp() {
+    if (gameRunning && powerUps.length < 2) {
+        var types = ['speed', 'shield'];
+        var randomType = types[Math.floor(Math.random() * types.length)];
+        powerUps.push(new PowerUp(randomType));
+    }
+    if (gameRunning) {
+        setTimeout(spawnPowerUp, powerUpSpawnInterval);
+    }
+}
 function drawHUD() {
     ctx.fillStyle = 'black';
     ctx.font = '20px Arial';
     ctx.textAlign = 'left';
     ctx.fillText("Punti: ".concat(score), 20, 30);
+    // Disegna vite
     for (var i = 0; i < playerLives; i++) {
         drawHeart(ctx, 20 + (i * 30), 60, 2.5);
+    }
+    // Disegna indicatori power-up
+    if (tank.speed > tank.baseSpeed) {
+        drawStar(ctx, 20, 100, 5, 10, 5);
+    }
+    if (tank.hasShield) {
+        drawShield(ctx, 50, 100, 20);
     }
 }
 function drawHeart(ctx, x, y, size) {
@@ -194,6 +307,7 @@ function drawHeart(ctx, x, y, size) {
     ctx.restore();
 }
 function checkCollisions() {
+    // Collisione proiettili-nemici
     tank.bullets.forEach(function (bullet) {
         enemies.forEach(function (enemy) {
             var dx = bullet.x - enemy.x;
@@ -206,16 +320,32 @@ function checkCollisions() {
             }
         });
     });
+    // Collisione tank-nemici
     enemies.forEach(function (enemy) {
         var dx = tank.x - enemy.x;
         var dy = tank.y - enemy.y;
         var distance = Math.sqrt(dx * dx + dy * dy);
         if (distance < 25 && enemy.alive) {
-            playerLives -= 1;
+            if (tank.hasShield) {
+                tank.hasShield = false;
+            }
+            else {
+                playerLives -= 1;
+            }
             enemy.alive = false;
             if (playerLives <= 0) {
                 gameRunning = false;
             }
+        }
+    });
+    // Collisione tank-power-up
+    powerUps.forEach(function (powerUp, index) {
+        var dx = tank.x - powerUp.x;
+        var dy = tank.y - powerUp.y;
+        var distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < 25 && powerUp.active) {
+            tank.applyPowerUp(powerUp.type);
+            powerUp.active = false;
         }
     });
 }
@@ -294,6 +424,16 @@ function gameLoop(currentTime) {
         enemy.update(delta, tank.x, tank.y);
         enemy.draw();
     });
+    powerUps = powerUps.filter(function (p) { return p.active; });
+    powerUps.forEach(function (powerUp) {
+        powerUp.update();
+        powerUp.draw();
+    });
+    // Spawna power-up periodicamente
+    if (currentTime - lastPowerUpSpawnTime > powerUpSpawnInterval) {
+        spawnPowerUp();
+        lastPowerUpSpawnTime = currentTime;
+    }
     checkCollisions();
     drawHUD();
     requestAnimationFrame(gameLoop);

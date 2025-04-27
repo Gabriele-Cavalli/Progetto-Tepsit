@@ -80,14 +80,98 @@ canvas.addEventListener('click', (e) => {
   }
 });
 
+// Tipi di power-up
+type PowerUpType = 'speed' | 'shield';
+
+class PowerUp {
+  x: number;
+  y: number;
+  type: PowerUpType;
+  active: boolean = true;
+  spawnTime: number;
+  duration: number = 10000; // 10 secondi
+  size: number = 20;
+
+  constructor(type: PowerUpType) {
+    this.x = Math.random() * (canvas.width - 40) + 20;
+    this.y = Math.random() * (canvas.height - 40) + 20;
+    this.type = type;
+    this.spawnTime = performance.now();
+  }
+
+  draw() {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    
+    if (this.type === 'speed') {
+      // Disegna stella arancione
+      ctx.fillStyle = 'orange';
+      drawStar(ctx, 0, 0, 5, this.size, this.size/2);
+    } else {
+      // Disegna scudo azzurro
+      ctx.fillStyle = 'cyan';
+      drawShield(ctx, 0, 0, this.size);
+    }
+    
+    ctx.restore();
+  }
+
+  update() {
+    // Il power-up scompare dopo un certo tempo
+    if (performance.now() - this.spawnTime > this.duration) {
+      this.active = false;
+    }
+  }
+}
+
+// Funzione per disegnare una stella
+function drawStar(ctx: CanvasRenderingContext2D, cx: number, cy: number, spikes: number, outerRadius: number, innerRadius: number) {
+  let rot = Math.PI / 2 * 3;
+  let x = cx;
+  let y = cy;
+  let step = Math.PI / spikes;
+
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - outerRadius);
+  
+  for (let i = 0; i < spikes; i++) {
+    x = cx + Math.cos(rot) * outerRadius;
+    y = cy + Math.sin(rot) * outerRadius;
+    ctx.lineTo(x, y);
+    rot += step;
+
+    x = cx + Math.cos(rot) * innerRadius;
+    y = cy + Math.sin(rot) * innerRadius;
+    ctx.lineTo(x, y);
+    rot += step;
+  }
+  
+  ctx.lineTo(cx, cy - outerRadius);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Funzione per disegnare uno scudo
+function drawShield(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number) {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - size/2);
+  ctx.quadraticCurveTo(cx + size/2, cy, cx, cy + size/2);
+  ctx.quadraticCurveTo(cx - size/2, cy, cx, cy - size/2);
+  ctx.closePath();
+  ctx.fill();
+}
+
 class Tank {
   x: number;
   y: number;
   angle: number;
+  baseSpeed: number = 200;
   speed: number = 200;
   bullets: Bullet[] = [];
   lastShotTime: number = 0;
   shotCooldown: number = 300;
+  hasShield: boolean = false;
+  powerUpEndTime: number = 0;
 
   constructor(x: number, y: number) {
     this.x = x;
@@ -99,6 +183,15 @@ class Tank {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
+    
+    // Disegna scudo se attivo
+    if (this.hasShield) {
+      ctx.fillStyle = 'rgba(0, 255, 255, 0.3)';
+      ctx.beginPath();
+      ctx.arc(0, 0, 30, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
     ctx.fillStyle = tankColor;
     ctx.fillRect(-15, -10, 30, 20);
     ctx.fillStyle = 'black';
@@ -107,6 +200,13 @@ class Tank {
   }
 
   update(delta: number) {
+    // Controlla se i power-up sono scaduti
+    if (this.powerUpEndTime > 0 && performance.now() > this.powerUpEndTime) {
+      this.speed = this.baseSpeed;
+      this.hasShield = false;
+      this.powerUpEndTime = 0;
+    }
+    
     const distance = this.speed * delta;
     if (keys['ArrowUp']) {
       this.x += distance * Math.cos(this.angle);
@@ -123,6 +223,16 @@ class Tank {
   shoot() {
     if (this.bullets.length < 5) {
       this.bullets.push(new Bullet(this.x, this.y, this.angle));
+    }
+  }
+
+  applyPowerUp(type: PowerUpType) {
+    if (type === 'speed') {
+      this.speed = this.baseSpeed * 1.5; // Aumenta la velocità del 50%
+      this.powerUpEndTime = performance.now() + 10000; // 10 secondi
+    } else if (type === 'shield') {
+      this.hasShield = true;
+      this.powerUpEndTime = performance.now() + 10000; // 10 secondi
     }
   }
 }
@@ -185,15 +295,20 @@ class Enemy {
 
 let tank = new Tank(canvas.width / 2, canvas.height / 2);
 let enemies: Enemy[] = [];
+let powerUps: PowerUp[] = [];
 let lastTime = performance.now();
+let lastPowerUpSpawnTime = 0;
+const powerUpSpawnInterval = 15000; // 15 secondi
 
 function startGame() {
   tank = new Tank(canvas.width / 2, canvas.height / 2);
   enemies = [];
+  powerUps = [];
   score = 0;
   playerLives = 3;
   gameRunning = true;
   spawnEnemy();
+  lastPowerUpSpawnTime = performance.now();
   requestAnimationFrame(gameLoop);
 }
 
@@ -206,13 +321,34 @@ function spawnEnemy() {
   }
 }
 
+function spawnPowerUp() {
+  if (gameRunning && powerUps.length < 2) {
+    const types: PowerUpType[] = ['speed', 'shield'];
+    const randomType = types[Math.floor(Math.random() * types.length)];
+    powerUps.push(new PowerUp(randomType));
+  }
+  if (gameRunning) {
+    setTimeout(spawnPowerUp, powerUpSpawnInterval);
+  }
+}
+
 function drawHUD() {
   ctx.fillStyle = 'black';
   ctx.font = '20px Arial';
   ctx.textAlign = 'left';
   ctx.fillText(`Punti: ${score}`, 20, 30);
-  for(let i = 0; i < playerLives; i++){
-    drawHeart(ctx,20+(i*30),60,2.5);
+  
+  // Disegna vite
+  for(let i = 0; i < playerLives; i++) {
+    drawHeart(ctx, 20 + (i * 30), 60, 2.5);
+  }
+  
+  // Disegna indicatori power-up
+  if (tank.speed > tank.baseSpeed) {
+    drawStar(ctx, 20, 100, 5, 10, 5);
+  }
+  if (tank.hasShield) {
+    drawShield(ctx, 50, 100, 20);
   }
 }
 
@@ -233,6 +369,7 @@ function drawHeart(ctx: CanvasRenderingContext2D, x: number, y: number, size: nu
 }
 
 function checkCollisions() {
+  // Collisione proiettili-nemici
   tank.bullets.forEach((bullet) => {
     enemies.forEach((enemy) => {
       const dx = bullet.x - enemy.x;
@@ -246,16 +383,32 @@ function checkCollisions() {
     });
   });
 
+  // Collisione tank-nemici
   enemies.forEach((enemy) => {
     const dx = tank.x - enemy.x;
     const dy = tank.y - enemy.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
     if (distance < 25 && enemy.alive) {
-      playerLives -= 1;
+      if (tank.hasShield) {
+        tank.hasShield = false;
+      } else {
+        playerLives -= 1;
+      }
       enemy.alive = false;
       if (playerLives <= 0) {
         gameRunning = false;
       }
+    }
+  });
+
+  // Collisione tank-power-up
+  powerUps.forEach((powerUp, index) => {
+    const dx = tank.x - powerUp.x;
+    const dy = tank.y - powerUp.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance < 25 && powerUp.active) {
+      tank.applyPowerUp(powerUp.type);
+      powerUp.active = false;
     }
   });
 }
@@ -349,6 +502,18 @@ function gameLoop(currentTime: number) {
     enemy.update(delta, tank.x, tank.y);
     enemy.draw();
   });
+
+  powerUps = powerUps.filter(p => p.active);
+  powerUps.forEach((powerUp) => {
+    powerUp.update();
+    powerUp.draw();
+  });
+
+  // Spawna power-up periodicamente
+  if (currentTime - lastPowerUpSpawnTime > powerUpSpawnInterval) {
+    spawnPowerUp();
+    lastPowerUpSpawnTime = currentTime;
+  }
 
   checkCollisions();
   drawHUD();
