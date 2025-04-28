@@ -1,32 +1,33 @@
+//Dichiarazione constate per il canvas
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
-//let 1
+//inizializazione di variabili e flag
 let keys: { [key: string]: boolean } = {};
 let gameRunning = false;
 let score = 0;
 let playerLives = 3;
 let gameStarted = false;
 let playerName = "";
-
+//creazione del tipo entry della clasifica
 interface ScoreEntry {
   name: string;
   score: number;
 }
-
+//prende da local storage le leaderboard
 let leaderboard: ScoreEntry[] = JSON.parse(localStorage.getItem("leaderboard") || "[]");
 
 // Aggiunte per la selezione del colore
 const colors = ['blue', 'red', 'yellow'];
 let selectedColorIndex = 0;
 let tankColor = colors[selectedColorIndex];
-
+//prende il nome contneuto nel cmapo testo
 (document.getElementById('playerNameInput') as HTMLInputElement).addEventListener('input', (e) => {
   const input = e.target as HTMLInputElement;
   playerName = input.value.trim();
 });
-
+//event listener per rilevare se si sta premendo un tatso
 window.addEventListener('keydown', (e) => {
   const active = document.activeElement;
   if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
@@ -34,7 +35,7 @@ window.addEventListener('keydown', (e) => {
   }
 
   keys[e.code] = true;
-
+  //controlla se si è premuto enter e si è inserito il nome e che il gioco no sia partito e chen on stia
   if (!gameStarted && e.code === 'Enter') {
     if (!playerName) {
       alert("Inserisci il tuo nome prima di iniziare!");
