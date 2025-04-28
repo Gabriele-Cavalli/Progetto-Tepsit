@@ -163,127 +163,128 @@ function drawShield(ctx: CanvasRenderingContext2D, cx: number, cy: number, size:
 }
 
 class Tank {
-  x: number;
+  x: number; 
   y: number;
-  angle: number;
+  angle: number; //angolo rotazione
   baseSpeed: number = 200;
   speed: number = 200;
-  bullets: Bullet[] = [];
-  lastShotTime: number = 0;
-  shotCooldown: number = 300;
-  hasShield: boolean = false;
+  bullets: Bullet[] = []; //array proiettili
+  lastShotTime: number = 0; 
+  shotCooldown: number = 300; //intervallo tra spari
+  hasShield: boolean = false; //indicazione scudo
   powerUpEndTime: number = 0;
 
-  constructor(x: number, y: number) {
+  constructor(x: number, y: number) {//creazione di un carro armato
     this.x = x;
     this.y = y;
     this.angle = 0;
   }
 
   draw() {
-    ctx.save();
-    ctx.translate(this.x, this.y);
+    ctx.save();//salvataggio stato attuale
+    ctx.translate(this.x, this.y);//traslazione 
     ctx.rotate(this.angle);
     
     // Disegna scudo se attivo
     if (this.hasShield) {
-      ctx.fillStyle = 'rgba(0, 255, 255, 0.3)';
-      ctx.beginPath();
+      ctx.fillStyle = 'rgba(0, 255, 255, 0.3)';//colore blu
+      ctx.beginPath();//nuovo percorso
       ctx.arc(0, 0, 30, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fill();//colora interno
     }
     
     ctx.fillStyle = tankColor;
-    ctx.fillRect(-15, -10, 30, 20);
+    ctx.fillRect(-15, -10, 30, 20);//disegna corpo carro (rettangolo)
     ctx.fillStyle = 'black';
-    ctx.fillRect(10, -3, 15, 6);
+    ctx.fillRect(10, -3, 15, 6);//disegna canna cannone
     ctx.restore();
   }
-
-  update(delta: number) {
+  //aggiornamento stato
+  update(delta: number) {//tempo trascorso dall'ultimo frame
     // Controlla se i power-up sono scaduti
     if (this.powerUpEndTime > 0 && performance.now() > this.powerUpEndTime) {
-      this.speed = this.baseSpeed;
-      this.hasShield = false;
+      this.speed = this.baseSpeed;//rispristino velocità
+      this.hasShield = false;//disattiva scudo
       this.powerUpEndTime = 0;
     }
     
-    const distance = this.speed * delta;
-    if (keys['ArrowUp']) {
+    const distance = this.speed * delta;//calcolo distanza con velocità e tempo trascorso
+    //gestione dei tasti
+    if (keys['ArrowUp']) {//se premo freccia in su 
       this.x += distance * Math.cos(this.angle);
       this.y += distance * Math.sin(this.angle);
     }
-    if (keys['ArrowLeft']) this.angle -= 2 * delta;
-    if (keys['ArrowRight']) this.angle += 2 * delta;
-    if (keys['Space'] && performance.now() - this.lastShotTime > this.shotCooldown) {
-      this.shoot();
+    if (keys['ArrowLeft']) this.angle -= 2 * delta;//freccia sinistra
+    if (keys['ArrowRight']) this.angle += 2 * delta;//freccia destra
+    if (keys['Space'] && performance.now() - this.lastShotTime > this.shotCooldown) {//spaziatrice
+      this.shoot();//spara se passano millisecondi da ultimo sparo
       this.lastShotTime = performance.now();
     }
   }
-
+//sparo
   shoot() {
-    if (this.bullets.length < 5) {
-      this.bullets.push(new Bullet(this.x, this.y, this.angle));
+    if (this.bullets.length < 5) {//se ci sono 5 colpi
+      this.bullets.push(new Bullet(this.x, this.y, this.angle));//crea bullet da queste posizioni
     }
   }
-
+//attivazione dei power-up
   applyPowerUp(type: PowerUpType) {
     if (type === 'speed') {
       this.speed = this.baseSpeed * 1.5; // Aumenta la velocità del 50%
       this.powerUpEndTime = performance.now() + 10000; // 10 secondi
     } else if (type === 'shield') {
-      this.hasShield = true;
+      this.hasShield = true;//attiva scudo
       this.powerUpEndTime = performance.now() + 10000; // 10 secondi
     }
   }
 }
-
+//proiettile
 class Bullet {
-  x: number;
-  y: number;
-  angle: number;
-  speed: number = 400;
-  active: boolean = true;
+  x: number;//pos x
+  y: number;//pos y 
+  angle: number;//angolo movimento proiettile
+  speed: number = 400;//velocità
+  active: boolean = true;//stato
 
-  constructor(x: number, y: number, angle: number) {
+  constructor(x: number, y: number, angle: number) {//creazione proiettile
     this.x = x;
     this.y = y;
     this.angle = angle;
   }
-
-  update(delta: number) {
+//aggiornamento della posizione
+  update(delta: number) {//si considera velocità, tempo trascorso e direzione
     this.x += this.speed * delta * Math.cos(this.angle);
     this.y += this.speed * delta * Math.sin(this.angle);
-    if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) {
-      this.active = false;
+    if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) {//se proiettile esce fuori dallo schermo
+      this.active = false;//disattivato
     }
   }
 
   draw() {
     ctx.fillStyle = 'red';
     ctx.beginPath();
-    ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);//cerchio di raggio 5
+    ctx.fill();//riempie di rosso
   }
 }
-
+//nemici
 class Enemy {
   x: number;
   y: number;
-  speed: number = 80;
-  alive: boolean = true;
+  speed: number = 80;//vel
+  alive: boolean = true;//stato
 
-  constructor() {
+  constructor() {//creazione con posizioni casuali
     this.x = Math.random() * canvas.width;
     this.y = Math.random() * canvas.height;
   }
-
-  update(delta: number, targetX: number, targetY: number) {
+//aggiorna movimento
+  update(delta: number, targetX: number, targetY: number) {//distanza tra nemico e un bersaglio
     const dx = targetX - this.x;
     const dy = targetY - this.y;
-    const length = Math.sqrt(dx * dx + dy * dy);
+    const length = Math.sqrt(dx * dx + dy * dy);//calcola distanza
     if (length !== 0) {
-      this.x += (dx / length) * this.speed * delta;
+      this.x += (dx / length) * this.speed * delta;//moltiplica per velocità e tempo trascorso
       this.y += (dy / length) * this.speed * delta;
     }
   }
