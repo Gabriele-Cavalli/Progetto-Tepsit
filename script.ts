@@ -2,7 +2,7 @@ const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
-
+//let
 let keys: { [key: string]: boolean } = {};
 let gameRunning = false;
 let score = 0;
